@@ -13,12 +13,13 @@ from flask import Flask, jsonify
 #################################################
 # Database Setup
 #################################################
-engine = create_engine("sqlite:///../Resources/hawaii.sqlite")
+
+engine = create_engine("sqlite:///Resources/hawaii.sqlite")
 
 # reflect an existing database into a new model
 Base = automap_base()
 # reflect the tables
-Base.prepare(auotload_with= engine)
+Base.prepare(autoload_with = engine)
 
 # Save references to each table
 Measurement = Base.classes.measurement
@@ -46,8 +47,8 @@ def Hello_World():
         f"/api/v1.0/precipitation<br/>"
         f"/api/v1.0/stations<br/>"
         f"/api/v1.0/tobs<br/>"
-        f"/api/v1.0/<start><br/>"
-        f"/api/v1.0/<start>/<end>"
+        f"/api/v1.0/start<br/>"
+        f"/api/v1.0/start/end"
     )
 
 @app.route('/api/v1.0/precipitation')
@@ -59,6 +60,7 @@ def precipitation():
     results = session.query(Measurement.date, Measurement.prcp).all()
 
     session.close()
+
 
     all_percipitation = []
     for date,prcp in results:
@@ -80,11 +82,11 @@ def stations():
     all_stations = []
     for station, name, latitude, longitude, elevation in results:
         station_dict = {}
-        station_dict["Station"] = station
-        station_dict["Name"] = name
-        station_dict["Latitude"] = latitude
-        station_dict["Longitude"] = longitude
-        station_dict["Elevation"] = elevation
+        station_dict["station"] = station
+        station_dict["name"] = name
+        station_dict["latitude"] = latitude
+        station_dict["longitude"] = longitude
+        station_dict["elevation"] = elevation
         all_stations.append(station_dict)
 
 
@@ -97,40 +99,65 @@ def tobs():
     
     session = Session(engine)
     """Return a list of all temp. observations"""
-    results = session.query(Passenger.name, Passenger.age, Passenger.sex).all()
+    results_date = session.query(Measurement.date).order_by(Measurement.date.desc()).first()
+    string_date = list(np.ravel(results_date))[0]
+    last_date = dt.datetime.strptime(string_date, "%Y-%m-%d")
+    back_year = last_date - dt.timedelta(days=365)
 
+    results = session.query(Measurement.date, Measurement.tobs).order_by(Measurement.date.desc()).filter(Measurement.date >= back_year).all()
     session.close()
 
-    all_names = [name[0] for name in results]
+    all_temp = []
+    for tobs,date in results:
+        tobs_dict = ()
+        tobs_dict['date'] = date
+        tobs_dict['tobs'] = tobs
+        all_temp.append(tobs_dict)
 
-    return jsonify(all_names)
+    return jsonify(all_temp)
 
 
 @app.route('/api/v1.0/start')
-def start():
+def calc_temp_start(start):
 
     session = Session(engine)
-    """Return a list of all temp. observations"""
-    results = session.query(Passenger.name, Passenger.age, Passenger.sex).all()
+    """TMIN, TAVG, AND TMAX list of start dates"""
+    results = session.query(func.min(Measurement.tobs), func.max(Measurement.tobs), func.sum(Measurement.tobs)).order_by(Measurement.date >= start).all()
 
     session.close()
 
-    all_names = [name[0] for name in results]
+    all_start = []
+    for min, max, sum in results:
+        start_dict = {}
+        start_dict["Min"] = min
+        start_dict["Max"] = max
+        start_dict["Average"] = sum
+        all_start.append(start_dict)
 
-    return jsonify(all_names)
+    return jsonify(all_start)
 
 
 @app.route('/api/v1.0/start/end')
-def start_and_end():
+def start_and_end(start, end):
 
     session = Session(engine)
-    """Return a list of all temp. observations"""
-    results = session.query(Passenger.name, Passenger.age, Passenger.sex).all()
+    """TMIN, TAVG, AND TMAX list of start and end dates"""
+    results = session.query(func.min(Measurement.tobs), func.max(Measurement.tobs), func.sum(Measurement.tobs)).order_by(Measurement.date >= start).filter(Measurement.date <= end).all()
 
     session.close()
 
-    all_names = [name[0] for name in results]
+    all_start_end = []
+    for min, max, sum in results:
+        start_end_dict = {}
+        start_end_dict["Min"] = min
+        start_end_dict["Max"] = max
+        start_end_dict["Average"] = sum
+        all_start_end.append(start_end_dict)
 
-    return jsonify(all_names)
+    return jsonify(all_start_end)
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
 
 
